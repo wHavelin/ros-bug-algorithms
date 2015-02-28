@@ -1,0 +1,1 @@
+/usr/bin/c++       CMakeFiles/pose_publisher.dir/stage_control/src/pose_publisher.cxx.o  -o pose_publisher -rdynamic 

@@ -1,0 +1,8 @@
+prefix=/home/will/catkin_ws/install
+
+Name: cs465hw1
+Description: Description of cs465hw1
+Version: 0.0.0
+Cflags: 
+Libs: -L/home/will/catkin_ws/install/lib 
+Requires: 
