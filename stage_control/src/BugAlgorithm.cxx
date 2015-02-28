@@ -16,17 +16,18 @@ private:
   laser_geometry::LaserProjection projector;
   sensor_msgs::PointCloud cloud;
 
-  const String alogrithmName = "No Algorithm";
+  String alogrithmName = "No Algorithm";
   const double STOP_DISTANCE = 1;
   const double ARBITRARY_HIGH_NUMBER = 10000;
+  const double CLOSE_ENOUGH_CONSTANT = .1;
   const int LOOP_RATE = 10; //How many times per second the main while loop runs
 
-  double leastDistToGoal;
   double desiredHeading;
   double goalX;
   double goalY;
   bool avoidingObstacle;
   Robot robot;
+  bool[] directionIsOpen = new bool[8]; // 0 is forward, 1 is forward/right, 2 is right and so on
 
 public:
   BugAlgorithm(double startX, double startY,double goalX, double goalY){
@@ -96,6 +97,15 @@ public:
     return false;
   }
 
+  bool isCloseEnough(double value1, double value2){
+    if(std::abs(value1 - value2) < CLOSE_ENOUGH_CONSTANT){
+      return true;
+    }
+    else{
+      return false;
+    }
+  }
+
   void avoidObstacle(){
     avoidingObstacle = true;
     desiredHeading += .1;
@@ -104,26 +114,9 @@ public:
     }
   }
 
-  void circumnavigateObstacle(){
-    getOpenDirections();
-    figureOutWhichDirectionToGo();
-    if(inFirstLoop){
-      double distToGoal = distanceToGoal();
-      if(isDoneFirstLoop()){
-	inFirstLoop = false;
-      }
-    }
-    else {
-      if(isCloseEnough(distToGoal, leastDistToGoal)){
-	avoidingObstacle = false;
-	leastDistToGoal = ARBITRARY_HIGH_NUMBER;
-      } 
-    }
-  }
-
   void createPublishersAndSubscribers(ros::NodeHandle nh_){
     ros::Publisher robotMovementPublisher = nh_.advertise<geometry_msgs::Twist>("/cmd_vel", 1);
-    ros::Subscriber odomSubcriber = nh_.subscribe("/odom", 1000,getInfo);
+    ros::Subscriber odomSubcriber = nh_.subscribe("/odom", 1000,updateRobotStateWithOdometry);
     ros::Subscriber scanSubcriber = nh_.subscribe("/base_scan", 1000,getScan);
   }
 
@@ -133,12 +126,16 @@ public:
     robotMovementMessage.angular.z = 0;
   }
 
-  int main(int argc, char **argv)
-  {
-    goalX = std::atof(argv[1]); //Sets goalX to first command line argument
-    goalY = std::atof(argv[2]); //Sets goalY to second command line argument
+  void runAlgorithm(){
+    //MEANT TO BE OVERIDDEN BY SUBCLASSSES
+  }
 
-    ros::init(argc, argv, algorithmName);
+  void doAlgorithmSpecificIntitalization(){
+    //MEANT TO BE OVERIDDEN BY SUBCLASSES
+  }
+
+  void runBugAlgorithm(){
+     ros::init(argc, argv, algorithmName);
     ros::NodeHandle nh_;
 
     createPublishersAndSubscribers(nh_);
@@ -146,7 +143,8 @@ public:
     geometry_msgs::Twist robotMovementMessage;
 	
     ros::Rate loop_rate(LOOP_RATE);
-    calculateDesiredHeading();
+    
+    doAlgorithmSpecificInitializitation();
 
     while (ros::ok()){
       setRobotMovementMessageToZero(robotMovementMessage);
@@ -155,7 +153,7 @@ public:
       ros::spinOnce();
       loop_rate.sleep();
     }	
-    return 0;     
   }
+
 
 }
