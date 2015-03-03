@@ -1,12 +1,13 @@
 
 /**
- * Bug 1
+ * Bug 2
  * 
  * Will Havelin
  * February 2015.
  *
  */
 
+#include <vector>
 #include <laser_geometry/laser_geometry.h>
 #include <ros/ros.h>
 #include <std_msgs/String.h>
@@ -26,8 +27,7 @@
 laser_geometry::LaserProjection projector;
 sensor_msgs::PointCloud cloud;
 
-int cloudData  = 0;
-const double ROBOT_WIDTH = .2;
+std::vector<geometry_msgs::Point32> lineToGoal;
 const double STOP_DISTANCE = 1;
 double myHeading = 0.0;
 double myX = -15.27;
@@ -39,11 +39,8 @@ double avoidStartY = 0;
 double desiredHeading = 1.0;
 double goalX = 8;
 double goalY = 15;
-double leastDistFromGoal = 10000; //Arbitrary High Number
-bool oldData = true;
 bool move = false;
 bool startedGoingAround = false;
-bool inFirstLoop;
 bool wayToLeftBlocked = false;
 bool wentLeftLastTime = false;
 bool wayToRightBlocked = false;
@@ -260,14 +257,13 @@ void figureOutNewWayToGo(bool oldLeft, bool oldRight, bool oldForward){
 void circumnavigateObstacle(){
   if(std::abs(myX - avoidStartX) < .7 && std::abs(myY - avoidStartY)< .7){ 
     if(startedGoingAround){
-      inFirstLoop = false;
-      std::cout << "done with first loop\n";
+      //std::cout << "done with first loop\n";
     }
   }
   else{
     if(!startedGoingAround && (std::abs(myX - avoidStartX) > 1 || std::abs(myY - avoidStartY) > 1)){
 	startedGoingAround = true;
-	std::cout << "Started going around\n";
+	//std::cout << "Started going around\n";
     }
   }
   
@@ -296,10 +292,42 @@ void circumnavigateObstacle(){
   }
 }
 
+bool onLineToGoal(){
+  for(int i = 0; i < lineToGoal.size(); ++i){
+    if(std::abs(myX - lineToGoal[i].x) < .1){
+      if(std::abs(myY - lineToGoal[i].y) < .1){
+	return true;
+      }
+    }
+  }
+  return false;
+}
+
 double calculateDistanceFromGoal(){
   return std::sqrt(std::pow(std::abs(myX -goalX), 2) +  std::pow(std::abs(myY -goalY), 2));
 }
 
+  void createLineToGoal(){
+    double x = myX;
+    double y = myY;
+    geometry_msgs::Point32 p;
+    while(x < goalX){
+      x += .1; 
+      y += ((goalY -myY)* .1) / (goalX - myX);
+      p.x = x;
+      p.y = y;
+      lineToGoal.push_back(p);
+    }
+    y = myY;
+    x = myX;
+    while(y < goalY){
+      y += .1;
+      x += ((goalX - myX) * .1) / (goalY - myY);
+      p.x = x;
+      p.y = y;
+      lineToGoal.push_back(p);
+    }
+  }
 int main(int argc, char **argv)
 {
   goalX = std::atof(argv[1]);
@@ -307,7 +335,7 @@ int main(int argc, char **argv)
   myX = std::atof(argv[3]);
   myY = std::atof(argv[4]);
    /// Name your node
-	ros::init(argc, argv, "bug1");
+	ros::init(argc, argv, "bug2");
 	/// Every ros node needs a node handle, similar to your usual  file handle.
 	ros::NodeHandle nh_;
 
@@ -322,29 +350,24 @@ int main(int argc, char **argv)
 	ros::Rate loop_rate(50);
 	/// Standard way to run ros code. Will quite if ROS is not OK, that is, the master is dead.
 
+	createLineToGoal();
         calculateDesiredHeading();
 	while (ros::ok())
 	{
 	  base_cmd.linear.x = base_cmd.linear.y = base_cmd.angular.z = 0;
 	  //std::cout << desiredHeading << "\n";
 	  turn_towards_heading(base_cmd.angular.z);
-	  if(std::abs(myX - goalX) < .3 && std::abs(myY -goalY)< .3){
+	  if(std::abs(myX - goalX) < .3 && std::abs(myY - goalY) < .3){
+	    //std::cout << "reached the goal";
 	    return 0;
 	  }
 	  if(facingRightDirection()){
 	    if(avoidingObstacle){
 	      circumnavigateObstacle();
-	      double distFromGoal = calculateDistanceFromGoal();
-	      if(inFirstLoop){
-		if(distFromGoal < leastDistFromGoal){
-		  leastDistFromGoal = distFromGoal;
-		}
-	      }
-	      else if(std::abs(leastDistFromGoal - distFromGoal)< .5){
+	      if(onLineToGoal() && startedGoingAround){
 		avoidingObstacle = false;
-		leastDistFromGoal = 10000;
 		calculateDesiredHeading();
-		std::cout << "Done Avoiding Obstacle\n";
+		//std::cout << "done with obstacle continuing to goal\n";
 	      }
 	    }
 	    if(goingToHitObstacle()){
@@ -352,7 +375,6 @@ int main(int argc, char **argv)
 		std::cout << "Started Avoiding Obstacle\n" << myX << "," << myY << "\n";
 		avoidStartX = myX;
 		avoidStartY = myY;
-		inFirstLoop = true;
 		startedGoingAround = false;
 		avoidingObstacle = true;
 	      }

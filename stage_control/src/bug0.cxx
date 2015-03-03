@@ -165,6 +165,8 @@ int main(int argc, char **argv)
 {
   goal_x = std::atof(argv[1]);
   goal_y = std::atof(argv[2]);
+  myX = std::atof(argv[3]);
+  myY = std::atof(argv[4]);
    /// Name your node
 	ros::init(argc, argv, "bug0");
 	/// Every ros node needs a node handle, similar to your usual  file handle.
@@ -184,6 +186,9 @@ int main(int argc, char **argv)
         calculateDesiredHeading();
 	while (ros::ok())
 	{
+	  if(std::abs(myX - goal_x) < .3 && std::abs(myY - goal_y) < .3){
+	    return 0;
+	  }
 	  base_cmd.linear.x = base_cmd.linear.y = base_cmd.angular.z = 0;
 	  turn_towards_heading(base_cmd.angular.z);
 	  if(facingRightDirection()){
